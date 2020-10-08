@@ -174,7 +174,7 @@ class SelectorEvaluator extends Visitor {
         return false;
     }
 
-    // :before, :after, :first-letter/line can't match DOM elements.
+    // :before, :after, :first-letter/line, :active, :hover, :focus can't match DOM elements.
     if (_isLegacyPsuedoClass(selector.name)) return false;
 
     throw _unimplemented(selector);
@@ -182,7 +182,7 @@ class SelectorEvaluator extends Visitor {
 
   @override
   bool visitPseudoElementSelector(PseudoElementSelector selector) {
-    // :before, :after, :first-letter/line can't match DOM elements.
+    // :before, :after, :first-letter/line, :active, :hover, :focus can't match DOM elements.
     if (_isLegacyPsuedoClass(selector.name)) return false;
 
     throw _unimplemented(selector);
@@ -194,6 +194,9 @@ class SelectorEvaluator extends Visitor {
       case 'after':
       case 'first-line':
       case 'first-letter':
+      case 'active':
+      case 'hover':
+      case 'focus':
         return true;
       default:
         return false;
