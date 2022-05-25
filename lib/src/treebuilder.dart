@@ -10,29 +10,33 @@ import 'list_proxy.dart';
 import 'token.dart';
 import 'utils.dart';
 
-// The scope markers are inserted when entering object elements,
-// marquees, table cells, and table captions, and are used to prevent formatting
-// from "leaking" into tables, object elements, and marquees.
-const Element Marker = null;
-
-// TODO(jmesserly): this should extend ListBase<Element>, but my simple attempt
-// didn't work.
-class ActiveFormattingElements extends ListProxy<Element> {
-  // Override the "add" method.
-  // TODO(jmesserly): I'd rather not override this; can we do this in the
-  // calling code instead?
+/// Open elements in the formatting category, most recent element last.
+///
+/// `null` is used as the "marker" entry to prevent style from leaking when
+/// entering some elements.
+///
+/// https://html.spec.whatwg.org/multipage/parsing.html#list-of-active-formatting-elements
+class ActiveFormattingElements extends ListProxy<Element?> {
+  /// Push an element into the active formatting elements.
+  ///
+  /// Prevents equivalent elements from appearing more than 3 times following
+  /// the last `null` marker. If adding [node] would cause there to be more than
+  /// 3 equivalent elements the earliest identical element is removed.
+  // TODO - Earliest equivalent following a marker, as opposed to earliest
+  // identical regardless of marker position, should be removed.
   @override
-  void add(Element node) {
+  void add(Element? node) {
     var equalCount = 0;
-    if (node != Marker) {
+    if (node != null) {
       for (var element in reversed) {
-        if (element == Marker) {
+        if (element == null) {
           break;
         }
         if (_nodesEqual(element, node)) {
           equalCount += 1;
         }
         if (equalCount == 3) {
+          // TODO - https://github.com/dart-lang/html/issues/135
           remove(element);
           break;
         }
@@ -67,21 +71,21 @@ bool _nodesEqual(Element node1, Element node2) {
 
 /// Basic treebuilder implementation.
 class TreeBuilder {
-  final String defaultNamespace;
+  final String? defaultNamespace;
 
-  Document document;
+  late Document document;
 
   final List<Element> openElements = <Element>[];
 
   final activeFormattingElements = ActiveFormattingElements();
 
-  Node headPointer;
+  Node? headPointer;
 
-  Element formPointer;
+  Element? formPointer;
 
   /// Switch the function used to insert an element from the
   /// normal one to the misnested table one and back again
-  bool insertFromTable;
+  var insertFromTable = false;
 
   TreeBuilder(bool namespaceHTMLElements)
       : defaultNamespace = namespaceHTMLElements ? Namespaces.html : null {
@@ -101,7 +105,7 @@ class TreeBuilder {
     document = Document();
   }
 
-  bool elementInScope(target, {String variant}) {
+  bool elementInScope(target, {String? variant}) {
     //If we pass a node in we match that. if we pass a string
     //match any node with that name
     final exactNode = target is Node;
@@ -165,12 +169,12 @@ class TreeBuilder {
     // Step 2 and step 3: we start with the last element. So i is -1.
     var i = activeFormattingElements.length - 1;
     var entry = activeFormattingElements[i];
-    if (entry == Marker || openElements.contains(entry)) {
+    if (entry == null || openElements.contains(entry)) {
       return;
     }
 
     // Step 6
-    while (entry != Marker && !openElements.contains(entry)) {
+    while (entry != null && !openElements.contains(entry)) {
       if (i == 0) {
         //This will be reset to 0 below
         i = -1;
@@ -189,7 +193,7 @@ class TreeBuilder {
       entry = activeFormattingElements[i];
 
       // TODO(jmesserly): optimize this. No need to create a token.
-      final cloneToken = StartTagToken(entry.localName,
+      final cloneToken = StartTagToken(entry!.localName,
           namespace: entry.namespaceUri,
           data: LinkedHashMap.from(entry.attributes))
         ..span = entry.sourceSpan;
@@ -209,7 +213,7 @@ class TreeBuilder {
 
   void clearActiveFormattingElements() {
     var entry = activeFormattingElements.removeLast();
-    while (activeFormattingElements.isNotEmpty && entry != Marker) {
+    while (activeFormattingElements.isNotEmpty && entry != null) {
       entry = activeFormattingElements.removeLast();
     }
   }
@@ -217,11 +221,11 @@ class TreeBuilder {
   /// Check if an element exists between the end of the active
   /// formatting elements and the last marker. If it does, return it, else
   /// return null.
-  Element elementInActiveFormattingElements(String name) {
+  Element? elementInActiveFormattingElements(String? name) {
     for (var item in activeFormattingElements.reversed) {
       // Check for Marker first because if it's a Marker it doesn't have a
       // name attribute.
-      if (item == Marker) {
+      if (item == null) {
         break;
       } else if (item.localName == name) {
         return item;
@@ -242,7 +246,7 @@ class TreeBuilder {
     document.nodes.add(doctype);
   }
 
-  void insertComment(StringToken token, [Node parent]) {
+  void insertComment(StringToken token, [Node? parent]) {
     parent ??= openElements.last;
     parent.nodes.add(Comment(token.data)..sourceSpan = token.span);
   }
@@ -286,9 +290,9 @@ class TreeBuilder {
         // TODO(jmesserly): I don't think this is reachable. If insertFromTable
         // is true, there will be a <table> element open, and it always has a
         // parent pointer.
-        nodePos[0].nodes.add(element);
+        nodePos[0]!.nodes.add(element);
       } else {
-        nodePos[0].insertBefore(element, nodePos[1]);
+        nodePos[0]!.insertBefore(element, nodePos[1]);
       }
       openElements.add(element);
     }
@@ -296,7 +300,7 @@ class TreeBuilder {
   }
 
   /// Insert text data.
-  void insertText(String data, FileSpan span) {
+  void insertText(String data, FileSpan? span) {
     final parent = openElements.last;
 
     if (!insertFromTable ||
@@ -307,14 +311,14 @@ class TreeBuilder {
       // We should be in the InTable mode. This means we want to do
       // special magic element rearranging
       final nodePos = getTableMisnestedNodePosition();
-      _insertText(nodePos[0], data, span, nodePos[1] as Element);
+      _insertText(nodePos[0]!, data, span, nodePos[1] as Element?);
     }
   }
 
   /// Insert [data] as text in the current node, positioned before the
   /// start of node [refNode] or to the end of the node's text.
-  static void _insertText(Node parent, String data, FileSpan span,
-      [Element refNode]) {
+  static void _insertText(Node parent, String data, FileSpan? span,
+      [Element? refNode]) {
     final nodes = parent.nodes;
     if (refNode == null) {
       if (nodes.isNotEmpty && nodes.last is Text) {
@@ -323,7 +327,7 @@ class TreeBuilder {
 
         if (span != null) {
           last.sourceSpan =
-              span.file.span(last.sourceSpan.start.offset, span.end.offset);
+              span.file.span(last.sourceSpan!.start.offset, span.end.offset);
         }
       } else {
         nodes.add(Text(data)..sourceSpan = span);
@@ -341,13 +345,13 @@ class TreeBuilder {
 
   /// Get the foster parent element, and sibling to insert before
   /// (or null) when inserting a misnested table node
-  List<Node> getTableMisnestedNodePosition() {
+  List<Node?> getTableMisnestedNodePosition() {
     // The foster parent element is the one which comes before the most
     // recently opened table element
     // XXX - this is really inelegant
-    Element lastTable;
-    Node fosterParent;
-    Node insertBefore;
+    Element? lastTable;
+    Node? fosterParent;
+    Node? insertBefore;
     for (var elm in openElements.reversed) {
       if (elm.localName == 'table') {
         lastTable = elm;
@@ -369,7 +373,7 @@ class TreeBuilder {
     return [fosterParent, insertBefore];
   }
 
-  void generateImpliedEndTags([String exclude]) {
+  void generateImpliedEndTags([String? exclude]) {
     final name = openElements.last.localName;
     // XXX td, th and tr are not actually needed
     if (name != exclude &&

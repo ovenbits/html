@@ -2,6 +2,8 @@
 /// with dart:html, but it is missing many types and APIs.
 library dom;
 
+// ignore_for_file: constant_identifier_names
+
 // TODO(jmesserly): lots to do here. Originally I wanted to generate this using
 // our Blink IDL generator, but another idea is to directly use the excellent
 // http://dom.spec.whatwg.org/ and http://html.spec.whatwg.org/ and just
@@ -26,7 +28,7 @@ export 'src/css_class_set.dart' show CssClassSet;
 // that exposes namespace info.
 class AttributeName implements Comparable<Object> {
   /// The namespace prefix, e.g. `xlink`.
-  final String prefix;
+  final String? prefix;
 
   /// The attribute name, e.g. `title`.
   final String name;
@@ -55,22 +57,22 @@ class AttributeName implements Comparable<Object> {
   }
 
   @override
-  int compareTo(dynamic other) {
+  int compareTo(Object other) {
     // Not sure about this sort order
     if (other is! AttributeName) return 1;
-    final otherAttributeName = other as AttributeName;
-    var cmp = (prefix ?? '').compareTo((otherAttributeName.prefix ?? ''));
+    var cmp = (prefix ?? '').compareTo((other.prefix ?? ''));
     if (cmp != 0) return cmp;
-    cmp = name.compareTo(otherAttributeName.name);
+    cmp = name.compareTo(other.name);
     if (cmp != 0) return cmp;
-    return namespace.compareTo(otherAttributeName.namespace);
+    return namespace.compareTo(other.namespace);
   }
 
   @override
-  bool operator ==(x) {
-    if (x is! AttributeName) return false;
-    return prefix == x.prefix && name == x.name && namespace == x.namespace;
-  }
+  bool operator ==(Object other) =>
+      other is AttributeName &&
+      prefix == other.prefix &&
+      name == other.name &&
+      namespace == other.namespace;
 }
 
 // http://dom.spec.whatwg.org/#parentnode
@@ -84,8 +86,9 @@ abstract class _ParentNode implements Node {
   /// [selectors level 4](http://dev.w3.org/csswg/selectors-4/)
   /// are implemented. For example, nth-child does not implement An+B syntax
   /// and *-of-type is not implemented. If a selector is not implemented this
-  /// method will throw [UniplmentedError].
-  Element querySelector(String selector) => query.querySelector(this, selector);
+  /// method will throw [UnimplementedError].
+  Element? querySelector(String selector) =>
+      query.querySelector(this, selector);
 
   /// Returns all descendant nodes matching the given selectors, using a
   /// preorder traversal.
@@ -94,7 +97,7 @@ abstract class _ParentNode implements Node {
   /// [selectors level 4](http://dev.w3.org/csswg/selectors-4/)
   /// are implemented. For example, nth-child does not implement An+B syntax
   /// and *-of-type is not implemented. If a selector is not implemented this
-  /// method will throw [UniplmentedError].
+  /// method will throw [UnimplementedError].
   List<Element> querySelectorAll(String selector) =>
       query.querySelectorAll(this, selector);
 }
@@ -102,7 +105,7 @@ abstract class _ParentNode implements Node {
 // http://dom.spec.whatwg.org/#interface-nonelementparentnode
 abstract class _NonElementParentNode implements _ParentNode {
   // TODO(jmesserly): could be faster, should throw on invalid id.
-  Element getElementById(String id) => querySelector('#$id');
+  Element? getElementById(String id) => querySelector('#$id');
 }
 
 // This doesn't exist as an interface in the spec, but it's useful to merge
@@ -136,13 +139,13 @@ abstract class Node {
   static const int TEXT_NODE = 3;
 
   /// The parent of the current node (or null for the document node).
-  Node parentNode;
+  Node? parentNode;
 
   /// The parent element of this node.
   ///
   /// Returns null if this node either does not have a parent or its parent is
   /// not an element.
-  Element get parent {
+  Element? get parent {
     final parentNode = this.parentNode;
     return parentNode is Element ? parentNode : null;
   }
@@ -152,46 +155,42 @@ abstract class Node {
   ///
   /// Note that attribute order needs to be stable for serialization, so we use
   /// a LinkedHashMap. Each key is a [String] or [AttributeName].
-  LinkedHashMap<dynamic, String> attributes = LinkedHashMap();
+  LinkedHashMap<Object, String> attributes = LinkedHashMap();
 
   /// A list of child nodes of the current node. This must
   /// include all elements but not necessarily other node types.
-  final NodeList nodes = NodeList._();
+  late final nodes = NodeList._(this);
 
-  List<Element> _elements;
+  late final List<Element> children = FilteredElementList(this);
 
   // TODO(jmesserly): consider using an Expando for this, and put it in
   // dom_parsing. Need to check the performance affect.
   /// The source span of this node, if it was created by the [HtmlParser].
-  FileSpan sourceSpan;
+  FileSpan? sourceSpan;
 
   /// The attribute spans if requested. Otherwise null.
-  LinkedHashMap<dynamic, FileSpan> _attributeSpans;
-  LinkedHashMap<dynamic, FileSpan> _attributeValueSpans;
+  LinkedHashMap<Object, FileSpan>? _attributeSpans;
+  LinkedHashMap<Object, FileSpan>? _attributeValueSpans;
 
-  Node._() {
-    nodes._parent = this;
-  }
+  Node._();
 
   /// If [sourceSpan] is available, this contains the spans of each attribute.
   /// The span of an attribute is the entire attribute, including the name and
   /// quotes (if any). For example, the span of "attr" in `<a attr="value">`
   /// would be the text `attr="value"`.
-  LinkedHashMap<dynamic, FileSpan> get attributeSpans {
+  LinkedHashMap<Object, FileSpan>? get attributeSpans {
     _ensureAttributeSpans();
     return _attributeSpans;
   }
 
   /// If [sourceSpan] is available, this contains the spans of each attribute's
-  /// value. Unlike [attributeSpans], this span will inlcude only the value.
+  /// value. Unlike [attributeSpans], this span will include only the value.
   /// For example, the value span of "attr" in `<a attr="value">` would be the
   /// text `value`.
-  LinkedHashMap<dynamic, FileSpan> get attributeValueSpans {
+  LinkedHashMap<Object, FileSpan>? get attributeValueSpans {
     _ensureAttributeSpans();
     return _attributeValueSpans;
   }
-
-  List<Element> get children => _elements ??= FilteredElementList(this);
 
   /// Returns a copy of this node.
   ///
@@ -215,12 +214,13 @@ abstract class Node {
   }
 
   // Implemented per: http://dom.spec.whatwg.org/#dom-node-textcontent
-  String get text => null;
-  set text(String value) {}
+  String? get text => null;
+
+  set text(String? value) {}
 
   void append(Node node) => nodes.add(node);
 
-  Node get firstChild => nodes.isNotEmpty ? nodes[0] : null;
+  Node? get firstChild => nodes.isNotEmpty ? nodes[0] : null;
 
   void _addOuterHtml(StringBuffer str);
 
@@ -232,17 +232,12 @@ abstract class Node {
 
   Node remove() {
     // TODO(jmesserly): is parent == null an error?
-    if (parentNode != null) {
-      parentNode.nodes.remove(this);
-    }
+    parentNode?.nodes.remove(this);
     return this;
   }
 
   /// Insert [node] as a child of the current node, before [refNode] in the
-  /// list of child nodes. Raises [UnsupportedOperationException] if [refNode]
-  /// is not a child of the current node. If refNode is null, this adds to the
-  /// end of the list.
-  void insertBefore(Node node, Node refNode) {
+  void insertBefore(Node node, Node? refNode) {
     if (refNode == null) {
       nodes.add(node);
     } else {
@@ -255,7 +250,7 @@ abstract class Node {
     if (parentNode == null) {
       throw UnsupportedError('Node must have a parent to replace it.');
     }
-    parentNode.nodes[parentNode.nodes.indexOf(this)] = otherNode;
+    parentNode!.nodes[parentNode!.nodes.indexOf(this)] = otherNode;
     return this;
   }
 
@@ -279,12 +274,13 @@ abstract class Node {
   void _ensureAttributeSpans() {
     if (_attributeSpans != null) return;
 
-    _attributeSpans = LinkedHashMap<dynamic, FileSpan>();
-    _attributeValueSpans = LinkedHashMap<dynamic, FileSpan>();
+    final attributeSpans = _attributeSpans = LinkedHashMap<Object, FileSpan>();
+    final attributeValueSpans =
+        _attributeValueSpans = LinkedHashMap<Object, FileSpan>();
 
     if (sourceSpan == null) return;
 
-    final tokenizer = HtmlTokenizer(sourceSpan.text,
+    final tokenizer = HtmlTokenizer(sourceSpan!.text,
         generateSpans: true, attributeSpans: true);
 
     tokenizer.moveNext();
@@ -292,13 +288,14 @@ abstract class Node {
 
     if (token.attributeSpans == null) return; // no attributes
 
-    for (var attr in token.attributeSpans) {
-      final offset = sourceSpan.start.offset;
-      _attributeSpans[attr.name] =
-          sourceSpan.file.span(offset + attr.start, offset + attr.end);
+    for (var attr in token.attributeSpans!) {
+      final offset = sourceSpan!.start.offset;
+      final name = attr.name!;
+      attributeSpans[name] =
+          sourceSpan!.file.span(offset + attr.start, offset + attr.end);
       if (attr.startValue != null) {
-        _attributeValueSpans[attr.name] = sourceSpan.file
-            .span(offset + attr.startValue, offset + attr.endValue);
+        attributeValueSpans[name] = sourceSpan!.file
+            .span(offset + attr.startValue!, offset + attr.endValue);
       }
     }
   }
@@ -316,15 +313,18 @@ abstract class Node {
 class Document extends Node
     with _ParentNode, _NonElementParentNode, _ElementAndDocument {
   Document() : super._();
+
   factory Document.html(String html) => parse(html);
 
   @override
   int get nodeType => Node.DOCUMENT_NODE;
 
   // TODO(jmesserly): optmize this if needed
-  Element get documentElement => querySelector('html');
-  Element get head => documentElement.querySelector('head');
-  Element get body => documentElement.querySelector('body');
+  Element? get documentElement => querySelector('html');
+
+  Element? get head => documentElement?.querySelector('head');
+
+  Element? get body => documentElement?.querySelector('body');
 
   /// Returns a fragment of HTML or XML that represents the element and its
   /// contents.
@@ -347,7 +347,7 @@ class Document extends Node
 
   // TODO(jmesserly): this is only a partial implementation of:
   // http://dom.spec.whatwg.org/#dom-document-createelementns
-  Element createElementNS(String namespaceUri, String tag) {
+  Element createElementNS(String? namespaceUri, String? tag) {
     if (namespaceUri == '') namespaceUri = null;
     return Element._(tag, namespaceUri);
   }
@@ -357,6 +357,7 @@ class Document extends Node
 
 class DocumentFragment extends Node with _ParentNode, _NonElementParentNode {
   DocumentFragment() : super._();
+
   factory DocumentFragment.html(String html) => parseFragment(html);
 
   @override
@@ -380,15 +381,16 @@ class DocumentFragment extends Node with _ParentNode, _NonElementParentNode {
   void _addOuterHtml(StringBuffer str) => _addInnerHtml(str);
 
   @override
-  String get text => _getText(this);
+  String? get text => _getText(this);
+
   @override
-  set text(String value) => _setText(this, value);
+  set text(String? value) => _setText(this, value);
 }
 
 class DocumentType extends Node {
-  final String name;
-  final String publicId;
-  final String systemId;
+  final String? name;
+  final String? publicId;
+  final String? systemId;
 
   DocumentType(this.name, this.publicId, this.systemId) : super._();
 
@@ -421,9 +423,9 @@ class Text extends Node {
   /// The text node's data, stored as either a String or StringBuffer.
   /// We support storing a StringBuffer here to support fast [appendData].
   /// It will flatten back to a String on read.
-  dynamic _data;
+  Object _data;
 
-  Text(String data)
+  Text(String? data)
       : _data = data ?? '',
         super._();
 
@@ -431,8 +433,10 @@ class Text extends Node {
   int get nodeType => Node.TEXT_NODE;
 
   String get data => _data = _data.toString();
+
   set data(String value) {
-    _data = value ?? '';
+    // Handle unsound null values.
+    _data = identical(value, null) ? '' : value;
   }
 
   @override
@@ -452,25 +456,27 @@ class Text extends Node {
 
   @override
   String get text => data;
+
   @override
-  set text(String value) {
+  // Text has a non-nullable `text` field, while Node has a nullable field.
+  set text(covariant String value) {
     data = value;
   }
 }
 
 // TODO(jmesserly): Elements should have a pointer back to their document
 class Element extends Node with _ParentNode, _ElementAndDocument {
-  final String namespaceUri;
+  final String? namespaceUri;
 
   /// The [local name](http://dom.spec.whatwg.org/#concept-element-local-name)
   /// of this element.
-  final String localName;
+  final String? localName;
 
   // TODO(jmesserly): consider using an Expando for this, and put it in
   // dom_parsing. Need to check the performance affect.
   /// The source span of the end tag this element, if it was created by the
   /// [HtmlParser]. May be `null` if does not have an implicit end tag.
-  FileSpan endSourceSpan;
+  FileSpan? endSourceSpan;
 
   Element._(this.localName, [this.namespaceUri]) : super._();
 
@@ -505,14 +511,14 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
     //    creating them every call.
     // 2) Verify that the html does not contain leading or trailing text nodes.
     // 3) Verify that the html does not contain both <head> and <body> tags.
-    // 4) Detatch the created element from its dummy parent.
+    // 4) Detach the created element from its dummy parent.
     var parentTag = 'div';
-    String tag;
+    String? tag;
     final match = _startTagRegexp.firstMatch(html);
     if (match != null) {
-      tag = match.group(1).toLowerCase();
+      tag = match.group(1)!.toLowerCase();
       if (_customParentTagMap.containsKey(tag)) {
-        parentTag = _customParentTagMap[tag];
+        parentTag = _customParentTagMap[tag]!;
       }
     }
 
@@ -535,9 +541,9 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
   int get nodeType => Node.ELEMENT_NODE;
 
   // TODO(jmesserly): we can make this faster
-  Element get previousElementSibling {
+  Element? get previousElementSibling {
     if (parentNode == null) return null;
-    final siblings = parentNode.nodes;
+    final siblings = parentNode!.nodes;
     for (var i = siblings.indexOf(this) - 1; i >= 0; i--) {
       final s = siblings[i];
       if (s is Element) return s;
@@ -545,7 +551,8 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
     return null;
   }
 
-  Element get nextElementSibling {
+  Element? get nextElementSibling {
+    final parentNode = this.parentNode;
     if (parentNode == null) return null;
     final siblings = parentNode.nodes;
     for (var i = siblings.indexOf(this) + 1; i < siblings.length; i++) {
@@ -563,8 +570,9 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
 
   @override
   String get text => _getText(this);
+
   @override
-  set text(String value) => _setText(this, value);
+  set text(String? value) => _setText(this, value);
 
   /// Returns a fragment of HTML or XML that represents the element and its
   /// contents.
@@ -574,13 +582,14 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
   /// Can be set, to replace the contents of the element with nodes parsed from
   /// the given string.
   String get innerHtml => _innerHtml;
+
   // TODO(jmesserly): deprecate in favor of:
   // <https://api.dartlang.org/apidocs/channels/stable/#dart-dom-html.Element@id_setInnerHtml>
   set innerHtml(String value) {
     nodes.clear();
     // TODO(jmesserly): should be able to get the same effect by adding the
     // fragment directly.
-    nodes.addAll(parseFragment(value, container: localName).nodes);
+    nodes.addAll(parseFragment(value, container: localName!).nodes);
   }
 
   @override
@@ -625,7 +634,7 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
     if (!isVoidElement(localName)) str.write('</$localName>');
   }
 
-  static String _getSerializationPrefix(String uri) {
+  static String _getSerializationPrefix(String? uri) {
     if (uri == null ||
         uri == Namespaces.html ||
         uri == Namespaces.mathml ||
@@ -652,7 +661,7 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
   }
 
   set id(String value) {
-    attributes['id'] = '$value';
+    attributes['id'] = value;
   }
 
   // http://dom.spec.whatwg.org/#dom-element-classname
@@ -662,7 +671,7 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
   }
 
   set className(String value) {
-    attributes['class'] = '$value';
+    attributes['class'] = value;
   }
 
   /// The set of CSS classes applied to this element.
@@ -677,7 +686,7 @@ class Element extends Node with _ParentNode, _ElementAndDocument {
 }
 
 class Comment extends Node {
-  String data;
+  String? data;
 
   Comment(this.data) : super._();
 
@@ -696,9 +705,10 @@ class Comment extends Node {
   Comment clone(bool deep) => Comment(data);
 
   @override
-  String get text => data;
+  String? get text => data;
+
   @override
-  set text(String value) {
+  set text(String? value) {
     data = value;
   }
 }
@@ -707,11 +717,9 @@ class Comment extends Node {
 // (The requirement to remove the node from the old node list makes it tricky.)
 // TODO(jmesserly): is there any way to share code with the _NodeListImpl?
 class NodeList extends ListProxy<Node> {
-  // Note: this is conceptually final, but because of circular reference
-  // between Node and NodeList we initialize it after construction.
-  Node _parent;
+  final Node _parent;
 
-  NodeList._();
+  NodeList._(this._parent);
 
   Node _setParent(Node node) {
     // Note: we need to remove the node from its previous parent node, if any,
@@ -722,18 +730,18 @@ class NodeList extends ListProxy<Node> {
   }
 
   @override
-  void add(Node value) {
-    if (value is DocumentFragment) {
-      addAll(value.nodes);
+  void add(Node element) {
+    if (element is DocumentFragment) {
+      addAll(element.nodes);
     } else {
-      super.add(_setParent(value));
+      super.add(_setParent(element));
     }
   }
 
   void addLast(Node value) => add(value);
 
   @override
-  void addAll(Iterable<Node> collection) {
+  void addAll(Iterable<Node> iterable) {
     // Note: we need to be careful if collection is another NodeList.
     // In particular:
     //   1. we need to copy the items before updating their parent pointers,
@@ -741,7 +749,7 @@ class NodeList extends ListProxy<Node> {
     //   2. we should update parent pointers in reverse order. That way they
     //      are removed from the original NodeList (if any) from the end, which
     //      is faster.
-    final list = _flattenDocFragments(collection);
+    final list = _flattenDocFragments(iterable);
     for (var node in list.reversed) {
       _setParent(node);
     }
@@ -749,11 +757,11 @@ class NodeList extends ListProxy<Node> {
   }
 
   @override
-  void insert(int index, Node value) {
-    if (value is DocumentFragment) {
-      insertAll(index, value.nodes);
+  void insert(int index, Node element) {
+    if (element is DocumentFragment) {
+      insertAll(index, element.nodes);
     } else {
-      super.insert(index, _setParent(value));
+      super.insert(index, _setParent(element));
     }
   }
 
@@ -761,7 +769,7 @@ class NodeList extends ListProxy<Node> {
   Node removeLast() => super.removeLast()..parentNode = null;
 
   @override
-  Node removeAt(int i) => super.removeAt(i)..parentNode = null;
+  Node removeAt(int index) => super.removeAt(index)..parentNode = null;
 
   @override
   void clear() {
@@ -785,17 +793,17 @@ class NodeList extends ListProxy<Node> {
   // TODO(jmesserly): These aren't implemented in DOM _NodeListImpl, see
   // http://code.google.com/p/dart/issues/detail?id=5371
   @override
-  void setRange(int start, int rangeLength, Iterable<Node> from,
-      [int startFrom = 0]) {
-    var fromVar = from as List<Node>;
+  void setRange(int start, int end, Iterable<Node> iterable,
+      [int skipCount = 0]) {
+    var fromVar = iterable as List<Node>;
     if (fromVar is NodeList) {
       // Note: this is presumed to make a copy
-      fromVar = fromVar.sublist(startFrom, startFrom + rangeLength);
+      fromVar = fromVar.sublist(skipCount, skipCount + end);
     }
     // Note: see comment in [addAll]. We need to be careful about the order of
     // operations if [from] is also a NodeList.
-    for (var i = rangeLength - 1; i >= 0; i--) {
-      this[start + i] = fromVar[startFrom + i];
+    for (var i = end - 1; i >= 0; i--) {
+      this[start + i] = fromVar[skipCount + i];
     }
   }
 
@@ -806,11 +814,11 @@ class NodeList extends ListProxy<Node> {
   }
 
   @override
-  void removeRange(int start, int rangeLength) {
-    for (var i = start; i < rangeLength; i++) {
+  void removeRange(int start, int end) {
+    for (var i = start; i < end; i++) {
       this[i].parentNode = null;
     }
-    super.removeRange(start, rangeLength);
+    super.removeRange(start, end);
   }
 
   @override
@@ -830,9 +838,9 @@ class NodeList extends ListProxy<Node> {
   }
 
   @override
-  void insertAll(int index, Iterable<Node> collection) {
+  void insertAll(int index, Iterable<Node> iterable) {
     // Note: we need to be careful how we copy nodes. See note in addAll.
-    final list = _flattenDocFragments(collection);
+    final list = _flattenDocFragments(iterable);
     for (var node in list.reversed) {
       _setParent(node);
     }
@@ -880,8 +888,8 @@ class FilteredElementList extends IterableBase<Element>
   List<Element> get _filtered => _childNodes.whereType<Element>().toList();
 
   @override
-  void forEach(void Function(Element) f) {
-    _filtered.forEach(f);
+  void forEach(void Function(Element) action) {
+    _filtered.forEach(action);
   }
 
   @override
@@ -905,8 +913,8 @@ class FilteredElementList extends IterableBase<Element>
   String join([String separator = '']) => _filtered.join(separator);
 
   @override
-  void add(Element value) {
-    _childNodes.add(value);
+  void add(Element element) {
+    _childNodes.add(element);
   }
 
   @override
@@ -917,7 +925,7 @@ class FilteredElementList extends IterableBase<Element>
   }
 
   @override
-  bool contains(Object element) {
+  bool contains(Object? element) {
     return element is Element && _childNodes.contains(element);
   }
 
@@ -925,7 +933,7 @@ class FilteredElementList extends IterableBase<Element>
   Iterable<Element> get reversed => _filtered.reversed;
 
   @override
-  void sort([int Function(Element, Element) compare]) {
+  void sort([int Function(Element, Element)? compare]) {
     throw UnsupportedError('TODO(jacobr): should we impl?');
   }
 
@@ -936,12 +944,12 @@ class FilteredElementList extends IterableBase<Element>
   }
 
   @override
-  void fillRange(int start, int end, [Element fillValue]) {
+  void fillRange(int start, int end, [Element? fill]) {
     throw UnimplementedError();
   }
 
   @override
-  void replaceRange(int start, int end, Iterable<Element> iterable) {
+  void replaceRange(int start, int end, Iterable<Element> newContents) {
     throw UnimplementedError();
   }
 
@@ -959,23 +967,21 @@ class FilteredElementList extends IterableBase<Element>
 
   @override
   Element removeLast() {
-    final result = last;
-    if (result != null) {
-      result.remove();
-    }
-    return result;
+    return last..remove();
   }
 
   @override
   Iterable<T> map<T>(T Function(Element) f) => _filtered.map(f);
+
   @override
-  Iterable<Element> where(bool Function(Element) f) => _filtered.where(f);
+  Iterable<Element> where(bool Function(Element) test) => _filtered.where(test);
+
   @override
   Iterable<T> expand<T>(Iterable<T> Function(Element) f) => _filtered.expand(f);
 
   @override
-  void insert(int index, Element value) {
-    _childNodes.insert(index, value);
+  void insert(int index, Element element) {
+    _childNodes.insert(index, element);
   }
 
   @override
@@ -991,7 +997,7 @@ class FilteredElementList extends IterableBase<Element>
   }
 
   @override
-  bool remove(Object element) {
+  bool remove(Object? element) {
     if (element is! Element) return false;
     for (var i = 0; i < length; i++) {
       final indexElement = this[i];
@@ -1015,27 +1021,32 @@ class FilteredElementList extends IterableBase<Element>
   }
 
   @override
-  bool every(bool Function(Element) f) => _filtered.every(f);
+  bool every(bool Function(Element) test) => _filtered.every(test);
+
   @override
-  bool any(bool Function(Element) f) => _filtered.any(f);
+  bool any(bool Function(Element) test) => _filtered.any(test);
+
   @override
   List<Element> toList({bool growable = true}) =>
       List<Element>.from(this, growable: growable);
+
   @override
   Set<Element> toSet() => Set<Element>.from(this);
+
   @override
-  Element firstWhere(bool Function(Element) test, {Element Function() orElse}) {
+  Element firstWhere(bool Function(Element) test,
+      {Element Function()? orElse}) {
     return _filtered.firstWhere(test, orElse: orElse);
   }
 
   @override
-  Element lastWhere(bool Function(Element) test, {Element Function() orElse}) {
+  Element lastWhere(bool Function(Element) test, {Element Function()? orElse}) {
     return _filtered.lastWhere(test, orElse: orElse);
   }
 
   @override
   Element singleWhere(bool Function(Element) test,
-      {Element Function() orElse}) {
+      {Element Function()? orElse}) {
     if (orElse != null) throw UnimplementedError('orElse');
     return _filtered.singleWhere(test);
   }
@@ -1047,24 +1058,30 @@ class FilteredElementList extends IterableBase<Element>
 
   @override
   bool get isEmpty => _filtered.isEmpty;
+
   @override
   int get length => _filtered.length;
+
   @override
   Element operator [](int index) => _filtered[index];
+
   @override
   Iterator<Element> get iterator => _filtered.iterator;
+
   @override
-  List<Element> sublist(int start, [int end]) => _filtered.sublist(start, end);
+  List<Element> sublist(int start, [int? end]) => _filtered.sublist(start, end);
+
   @override
   Iterable<Element> getRange(int start, int end) =>
       _filtered.getRange(start, end);
+
   @override
-  int indexOf(Object element, [int start = 0]) =>
+  int indexOf(Object? element, [int start = 0]) =>
       // Cast forced by ListMixin https://github.com/dart-lang/sdk/issues/31311
       _filtered.indexOf(element as Element, start);
 
   @override
-  int lastIndexOf(Object element, [int start]) {
+  int lastIndexOf(Object? element, [int? start]) {
     start ??= length - 1;
     // Cast forced by ListMixin https://github.com/dart-lang/sdk/issues/31311
     return _filtered.lastIndexOf(element as Element, start);
@@ -1084,7 +1101,7 @@ class FilteredElementList extends IterableBase<Element>
 // For Element and DocumentFragment
 String _getText(Node node) => (_ConcatTextVisitor()..visit(node)).toString();
 
-void _setText(Node node, String value) {
+void _setText(Node node, String? value) {
   node.nodes.clear();
   node.append(Text(value));
 }

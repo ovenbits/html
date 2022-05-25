@@ -3,33 +3,41 @@ library support;
 
 import 'dart:collection';
 import 'dart:io';
+import 'dart:isolate';
 
-import 'package:path/path.dart' as p;
-import 'package:html/src/treebuilder.dart';
 import 'package:html/dom.dart';
 import 'package:html/dom_parsing.dart';
+import 'package:html/src/treebuilder.dart';
+import 'package:path/path.dart' as p;
 
 typedef TreeBuilderFactory = TreeBuilder Function(bool namespaceHTMLElements);
 
-Map<String, TreeBuilderFactory> _treeTypes;
-Map<String, TreeBuilderFactory> get treeTypes {
+Map<String, TreeBuilderFactory>? _treeTypes;
+Map<String, TreeBuilderFactory>? get treeTypes {
   // TODO(jmesserly): add DOM here once it's implemented
   _treeTypes ??= {'simpletree': (useNs) => TreeBuilder(useNs)};
   return _treeTypes;
 }
 
-final testDir = p.join(p.dirname(p.fromUri(Platform.packageConfig)), 'test');
+Future<String> get testDirectory async {
+  final packageUriDir = p.dirname(p.fromUri(await Isolate.resolvePackageUri(
+      Uri(scheme: 'package', path: 'html/html.dart'))));
+  // Assume pub layout - root is parent directory to package URI (`lib/`).
+  final rootPackageDir = p.dirname(packageUriDir);
+  return p.join(rootPackageDir, 'test');
+}
 
-final testDataDir = p.join(testDir, 'data');
-
-Iterable<String> getDataFiles(String subdirectory) {
-  final dir = Directory(p.join(testDataDir, subdirectory));
-  return dir.listSync().whereType<File>().map((f) => f.path);
+Stream<String> dataFiles(String subdirectory) async* {
+  final dir = Directory(p.join(await testDirectory, 'data', subdirectory));
+  await for (final file in dir.list()) {
+    if (file is! File) continue;
+    yield file.path;
+  }
 }
 
 // TODO(jmesserly): make this class simpler. We could probably split on
 // "\n#" instead of newline and remove a lot of code.
-class TestData extends IterableBase<Map<String, String>> {
+class TestData extends IterableBase<Map<String?, String>> {
   final String _text;
   final String newTestHeading;
 
@@ -40,12 +48,12 @@ class TestData extends IterableBase<Map<String, String>> {
   // Note: in Python this was a generator, but since we can't do that in Dart,
   // it's easier to convert it into an upfront computation.
   @override
-  Iterator<Map<String, String>> get iterator => _getData().iterator;
+  Iterator<Map<String?, String>> get iterator => _getData().iterator;
 
-  List<Map<String, String>> _getData() {
+  List<Map<String?, String>> _getData() {
     var data = <String, String>{};
-    String key;
-    final result = <Map<String, String>>[];
+    String? key;
+    final List<Map<String?, String>> result = <Map<String, String>>[];
     final lines = _text.split('\n');
     // Remove trailing newline to match Python
     if (lines.last == '') {
@@ -56,7 +64,7 @@ class TestData extends IterableBase<Map<String, String>> {
       if (heading != null) {
         if (data.isNotEmpty && heading == newTestHeading) {
           // Remove trailing newline
-          data[key] = data[key].substring(0, data[key].length - 1);
+          data[key!] = data[key]!.substring(0, data[key]!.length - 1);
           result.add(normaliseOutput(data));
           data = <String, String>{};
         }
@@ -75,7 +83,7 @@ class TestData extends IterableBase<Map<String, String>> {
 
   /// If the current heading is a test section heading return the heading,
   /// otherwise return null.
-  static String sectionHeading(String line) {
+  static String? sectionHeading(String line) {
     return line.startsWith('#') ? line.substring(1).trim() : null;
   }
 
@@ -110,12 +118,7 @@ class TestSerializer extends TreeVisitor {
 
   set indent(int value) {
     if (_indent == value) return;
-
-    final arr = List<int>(value);
-    for (var i = 0; i < value; i++) {
-      arr[i] = 32;
-    }
-    _spaces = String.fromCharCodes(arr);
+    _spaces = ' ' * value;
     _indent = value;
   }
 
@@ -170,7 +173,7 @@ class TestSerializer extends TreeVisitor {
       for (var key in keys) {
         final v = node.attributes[key];
         if (key is AttributeName) {
-          final attr = key as AttributeName;
+          final attr = key;
           key = '${attr.prefix} ${attr.name}';
         }
         _newline();

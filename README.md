@@ -8,7 +8,6 @@ Parsing HTML is easy!
 
 ```dart
 import 'package:html/parser.dart' show parse;
-import 'package:html/dom.dart';
 
 main() {
   var document = parse(
@@ -20,5 +19,3 @@ main() {
 You can pass a String or list of bytes to `parse`.
 There's also `parseFragment` for parsing a document fragment, and `HtmlParser`
 if you want more low level control.
-
-[html5parse]: http://dev.w3.org/html5/spec/parsing.html

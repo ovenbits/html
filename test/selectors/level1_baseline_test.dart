@@ -17,15 +17,16 @@ import '../support.dart';
 import 'level1_lib.dart';
 import 'selectors.dart';
 
-Document getTestContentDocument() {
-  final testPath = p.join(testDir, 'selectors', 'level1-content.html');
+Future<Document> testContentDocument() async {
+  final testPath =
+      p.join(await testDirectory, 'selectors', 'level1-content.html');
   return parse(File(testPath).readAsStringSync());
 }
 
 var testType = testQsaBaseline; // Only run baseline tests.
 var docType = 'html'; // Only run tests suitable for HTML
 
-void main() {
+void main() async {
   /*
    * This test suite tests Selectors API methods in 4 different contexts:
    * 1. Document node
@@ -62,9 +63,9 @@ void main() {
 
   // Prepare the nodes for testing
   //doc = frame.contentDocument;                 // Document Node tests
-  doc = getTestContentDocument();
+  doc = await testContentDocument();
 
-  final element = doc.getElementById('root'); // In-document Element Node tests
+  final element = doc.getElementById('root')!; // In-document Element Node tests
 
   //Setup the namespace tests
   setupSpecialElements(element);
@@ -87,11 +88,6 @@ void main() {
   fragment.append(element.clone(true));
 
   // Setup Tests
-  interfaceCheck('Document', doc);
-  interfaceCheck('Detached Element', detached);
-  interfaceCheck('Fragment', fragment);
-  interfaceCheck('In-document Element', element);
-
   runSpecialSelectorTests('Document', doc);
   runSpecialSelectorTests('Detached Element', detached);
   runSpecialSelectorTests('Fragment', fragment);
@@ -115,7 +111,7 @@ void main() {
 
   group('out of scope', () {
     setUp(() {
-      doc.body.append(outOfScope); // Append before in-document Element tests.
+      doc.body!.append(outOfScope); // Append before in-document Element tests.
       // None of these elements should match
     });
     tearDown(outOfScope.remove);
