@@ -60,7 +60,7 @@ class AttributeName implements Comparable<Object> {
   int compareTo(Object other) {
     // Not sure about this sort order
     if (other is! AttributeName) return 1;
-    var cmp = (prefix ?? '').compareTo((other.prefix ?? ''));
+    var cmp = (prefix ?? '').compareTo(other.prefix ?? '');
     if (cmp != 0) return cmp;
     cmp = name.compareTo(other.name);
     if (cmp != 0) return cmp;
@@ -76,7 +76,7 @@ class AttributeName implements Comparable<Object> {
 }
 
 // http://dom.spec.whatwg.org/#parentnode
-abstract class _ParentNode implements Node {
+mixin _ParentNode implements Node {
   // TODO(jmesserly): this is only a partial implementation
 
   /// Seaches for the first descendant node matching the given selectors, using
@@ -103,7 +103,7 @@ abstract class _ParentNode implements Node {
 }
 
 // http://dom.spec.whatwg.org/#interface-nonelementparentnode
-abstract class _NonElementParentNode implements _ParentNode {
+mixin _NonElementParentNode implements _ParentNode {
   // TODO(jmesserly): could be faster, should throw on invalid id.
   Element? getElementById(String id) => querySelector('#$id');
 }
@@ -112,7 +112,7 @@ abstract class _NonElementParentNode implements _ParentNode {
 // common methods from these:
 // http://dom.spec.whatwg.org/#interface-document
 // http://dom.spec.whatwg.org/#element
-abstract class _ElementAndDocument implements _ParentNode {
+abstract mixin class _ElementAndDocument implements _ParentNode {
   // TODO(jmesserly): could be faster, should throw on invalid tag/class names.
 
   List<Element> getElementsByTagName(String localName) =>
@@ -885,7 +885,8 @@ class FilteredElementList extends IterableBase<Element>
   //
   // TODO(nweiz): we don't always need to create a new list. For example
   // forEach, every, any, ... could directly work on the _childNodes.
-  List<Element> get _filtered => _childNodes.whereType<Element>().toList();
+  List<Element> get _filtered =>
+      _childNodes.whereType<Element>().toList(growable: false);
 
   @override
   void forEach(void Function(Element) action) {
@@ -1028,7 +1029,7 @@ class FilteredElementList extends IterableBase<Element>
 
   @override
   List<Element> toList({bool growable = true}) =>
-      List<Element>.from(this, growable: growable);
+      List<Element>.of(this, growable: growable);
 
   @override
   Set<Element> toSet() => Set<Element>.from(this);

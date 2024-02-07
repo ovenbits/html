@@ -1,11 +1,11 @@
 /// Query selector implementation for our DOM.
 library html.src.query;
 
-import 'package:csslib/parser.dart' as css;
-import 'package:csslib/parser.dart' show TokenKind, Message;
-import 'package:csslib/visitor.dart'; // the CSSOM
-import 'package:html/dom.dart';
-import 'package:html/src/constants.dart' show isWhitespaceCC;
+import 'package:csslib/parser.dart';
+import 'package:csslib/visitor.dart';
+
+import '../dom.dart';
+import 'constants.dart' show isWhitespaceCC;
 
 bool matches(Element node, String selector) =>
     SelectorEvaluator().matches(node, _parseSelectorList(selector));
@@ -23,7 +23,7 @@ List<Element> querySelectorAll(Node node, String selector) {
 // http://dev.w3.org/csswg/selectors-4/#grouping
 SelectorGroup _parseSelectorList(String selector) {
   final errors = <Message>[];
-  final group = css.parseSelectorGroup(selector, errors: errors);
+  final group = parseSelectorGroup(selector, errors: errors);
   if (group == null || errors.isNotEmpty) {
     throw FormatException("'$selector' is not a valid selector: $errors");
   }
@@ -70,22 +70,25 @@ class SelectorEvaluator extends Visitor {
     for (var s in node.simpleSelectorSequences.reversed) {
       if (combinator == null) {
         result = s.simpleSelector.visit(this) as bool;
-      } else if (combinator == TokenKind.COMBINATOR_DESCENDANT) {
-        // descendant combinator
-        // http://dev.w3.org/csswg/selectors-4/#descendant-combinators
-        do {
-          _element = _element!.parent;
-        } while (_element != null && !(s.simpleSelector.visit(this) as bool));
+      } else {
+        if (combinator == TokenKind.COMBINATOR_DESCENDANT) {
+          // descendant combinator
+          // http://dev.w3.org/csswg/selectors-4/#descendant-combinators
+          do {
+            _element = _element!.parent;
+          } while (_element != null && !(s.simpleSelector.visit(this) as bool));
 
-        if (_element == null) result = false;
-      } else if (combinator == TokenKind.COMBINATOR_TILDE) {
-        // Following-sibling combinator
-        // http://dev.w3.org/csswg/selectors-4/#general-sibling-combinators
-        do {
-          _element = _element!.previousElementSibling;
-        } while (_element != null && !(s.simpleSelector.visit(this) as bool));
+          if (_element == null) result = false;
+        } else if (combinator == TokenKind.COMBINATOR_TILDE) {
+          // Following-sibling combinator
+          // http://dev.w3.org/csswg/selectors-4/#general-sibling-combinators
+          do {
+            _element = _element!.previousElementSibling;
+          } while (_element != null && !(s.simpleSelector.visit(this) as bool));
 
-        if (_element == null) result = false;
+          if (_element == null) result = false;
+        }
+        combinator = null;
       }
 
       if (!result) break;
@@ -127,7 +130,7 @@ class SelectorEvaluator extends Visitor {
       UnimplementedError("'$selector' selector of type "
           '${selector.runtimeType} is not implemented');
 
-  FormatException _unsupported(selector) =>
+  FormatException _unsupported(TreeNode selector) =>
       FormatException("'$selector' is not a valid selector");
 
   @override
@@ -285,22 +288,16 @@ class SelectorEvaluator extends Visitor {
     if (node.operatorKind == TokenKind.NO_MATCH) return true;
 
     final select = '${node.value}';
-    switch (node.operatorKind) {
-      case TokenKind.EQUALS:
-        return value == select;
-      case TokenKind.INCLUDES:
-        return value.split(' ').any((v) => v.isNotEmpty && v == select);
-      case TokenKind.DASH_MATCH:
-        return value.startsWith(select) &&
-            (value.length == select.length || value[select.length] == '-');
-      case TokenKind.PREFIX_MATCH:
-        return value.startsWith(select);
-      case TokenKind.SUFFIX_MATCH:
-        return value.endsWith(select);
-      case TokenKind.SUBSTRING_MATCH:
-        return value.contains(select);
-      default:
-        throw _unsupported(node);
-    }
+    return switch (node.operatorKind) {
+      TokenKind.EQUALS => value == select,
+      TokenKind.INCLUDES =>
+        value.split(' ').any((v) => v.isNotEmpty && v == select),
+      TokenKind.DASH_MATCH => value.startsWith(select) &&
+          (value.length == select.length || value[select.length] == '-'),
+      TokenKind.PREFIX_MATCH => value.startsWith(select),
+      TokenKind.SUFFIX_MATCH => value.endsWith(select),
+      TokenKind.SUBSTRING_MATCH => value.contains(select),
+      _ => throw _unsupported(node)
+    };
   }
 }

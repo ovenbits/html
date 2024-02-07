@@ -200,7 +200,7 @@ const Map<String, String> errorMessages = {
   'unexpected-end-tag-after-body': 'Unexpected end tag token (%(name)s)'
       ' in the after body phase.',
   'unexpected-char-in-frameset':
-      'Unepxected characters in the frameset phase. Characters ignored.',
+      'Unexpected characters in the frameset phase. Characters ignored.',
   'unexpected-start-tag-in-frameset': 'Unexpected start tag token (%(name)s)'
       ' in the frameset phase. Ignored.',
   'unexpected-frameset-in-frameset-innerhtml':
@@ -246,26 +246,19 @@ class Namespaces {
   Namespaces._();
 
   static String? getPrefix(String? url) {
-    switch (url) {
-      case html:
-        return 'html';
-      case mathml:
-        return 'math';
-      case svg:
-        return 'svg';
-      case xlink:
-        return 'xlink';
-      case xml:
-        return 'xml';
-      case xmlns:
-        return 'xmlns';
-      default:
-        return null;
-    }
+    return switch (url) {
+      html => 'html',
+      mathml => 'math',
+      svg => 'svg',
+      xlink => 'xlink',
+      xml => 'xml',
+      xmlns => 'xmlns',
+      _ => null
+    };
   }
 }
 
-const List scopingElements = [
+const List<Pair<String, String>> scopingElements = [
   Pair(Namespaces.html, 'applet'),
   Pair(Namespaces.html, 'caption'),
   Pair(Namespaces.html, 'html'),

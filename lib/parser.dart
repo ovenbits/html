@@ -15,6 +15,7 @@ library parser;
 
 import 'dart:collection';
 import 'dart:math';
+
 import 'package:source_span/source_span.dart';
 
 import 'dom.dart';
@@ -36,7 +37,7 @@ import 'src/utils.dart';
 /// [Node.sourceSpan] property will be `null`. When using [generateSpans] you
 /// can additionally pass [sourceUrl] to indicate where the [input] was
 /// extracted from.
-Document parse(input,
+Document parse(dynamic input,
     {String? encoding, bool generateSpans = false, String? sourceUrl}) {
   final p = HtmlParser(input,
       encoding: encoding, generateSpans: generateSpans, sourceUrl: sourceUrl);
@@ -55,7 +56,7 @@ Document parse(input,
 /// [Node.sourceSpan] property will be `null`. When using [generateSpans] you can
 /// additionally pass [sourceUrl] to indicate where the [input] was extracted
 /// from.
-DocumentFragment parseFragment(input,
+DocumentFragment parseFragment(dynamic input,
     {String container = 'div',
     String? encoding,
     bool generateSpans = false,
@@ -93,7 +94,7 @@ class HtmlParser {
 
   Phase? originalPhase;
 
-  var framesetOK = true;
+  bool framesetOK = true;
 
   // These fields hold the different phase singletons. At any given time one
   // of them will be active.
@@ -140,7 +141,7 @@ class HtmlParser {
   /// automatic conversion of element and attribute names to lower case. Note
   /// that standard way to parse HTML is to lowercase, which is what the browser
   /// DOM will do if you request `Element.outerHTML`, for example.
-  HtmlParser(input,
+  HtmlParser(dynamic input,
       {String? encoding,
       bool parseMeta = true,
       bool lowercaseElementName = true,
@@ -150,7 +151,7 @@ class HtmlParser {
       String? sourceUrl,
       TreeBuilder? tree})
       : tree = tree ?? TreeBuilder(true),
-        tokenizer = (input is HtmlTokenizer
+        tokenizer = input is HtmlTokenizer
             ? input
             : HtmlTokenizer(input,
                 encoding: encoding,
@@ -158,7 +159,7 @@ class HtmlParser {
                 lowercaseElementName: lowercaseElementName,
                 lowercaseAttrName: lowercaseAttrName,
                 generateSpans: generateSpans,
-                sourceUrl: sourceUrl)) {
+                sourceUrl: sourceUrl) {
     tokenizer.parser = this;
   }
 
@@ -331,7 +332,7 @@ class HtmlParser {
 
     // When the loop finishes it's EOF
     var reprocess = true;
-    final reprocessPhases = [];
+    final reprocessPhases = <Phase>[];
     while (reprocess) {
       reprocessPhases.add(phase);
       reprocess = phase.processEOF();
@@ -348,7 +349,7 @@ class HtmlParser {
       .pointSpan();
 
   void parseError(SourceSpan? span, String errorcode,
-      [Map? datavars = const {}]) {
+      [Map<String, Object?>? datavars = const {}]) {
     if (!generateSpans && span == null) {
       span = _lastSpan;
     }
@@ -430,7 +431,7 @@ class HtmlParser {
       'ychannelselector': 'yChannelSelector',
       'zoomandpan': 'zoomAndPan'
     };
-    for (var originalName in token.data.keys.toList()) {
+    for (var originalName in token.data.keys.toList(growable: false)) {
       final svgName = replacements[originalName as String];
       if (svgName != null) {
         token.data[svgName] = token.data.remove(originalName)!;
@@ -456,7 +457,7 @@ class HtmlParser {
       'xmlns:xlink': AttributeName('xmlns', 'xlink', Namespaces.xmlns)
     };
 
-    for (var originalName in token.data.keys.toList()) {
+    for (var originalName in token.data.keys.toList(growable: false)) {
       final foreignName = replacements[originalName as String];
       if (foreignName != null) {
         token.data[foreignName] = token.data.remove(originalName)!;
@@ -632,7 +633,7 @@ class Phase {
 }
 
 class InitialPhase extends Phase {
-  InitialPhase(HtmlParser parser) : super(parser);
+  InitialPhase(super.parser);
 
   @override
   Token? processSpaceCharacters(SpaceCharactersToken token) {
@@ -652,9 +653,9 @@ class InitialPhase extends Phase {
     final systemId = token.systemId;
     final correct = token.correct;
 
-    if ((name != 'html' ||
+    if (name != 'html' ||
         publicId != null ||
-        systemId != null && systemId != 'about:legacy-compat')) {
+        systemId != null && systemId != 'about:legacy-compat') {
       parser.parseError(token.span, 'unknown-doctype');
     }
 
@@ -787,7 +788,7 @@ class InitialPhase extends Phase {
 }
 
 class BeforeHtmlPhase extends Phase {
-  BeforeHtmlPhase(HtmlParser parser) : super(parser);
+  BeforeHtmlPhase(super.parser);
 
   // helper methods
   void insertHtmlElement() {
@@ -848,7 +849,7 @@ class BeforeHtmlPhase extends Phase {
 }
 
 class BeforeHeadPhase extends Phase {
-  BeforeHeadPhase(HtmlParser parser) : super(parser);
+  BeforeHeadPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -922,7 +923,7 @@ class BeforeHeadPhase extends Phase {
 }
 
 class InHeadPhase extends Phase {
-  InHeadPhase(HtmlParser parser) : super(parser);
+  InHeadPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -1069,7 +1070,7 @@ class InHeadPhase extends Phase {
 // class InHeadNoScriptPhase extends Phase {
 
 class AfterHeadPhase extends Phase {
-  AfterHeadPhase(HtmlParser parser) : super(parser);
+  AfterHeadPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -1188,7 +1189,7 @@ class InBodyPhase extends Phase {
 
   // http://www.whatwg.org/specs/web-apps/current-work///parsing-main-inbody
   // the really-really-really-very crazy mode
-  InBodyPhase(HtmlParser parser) : super(parser);
+  InBodyPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -1468,7 +1469,7 @@ class InBodyPhase extends Phase {
     tree.insertElement(token);
     final element = tree.openElements.last;
 
-    final matchingElements = [];
+    final matchingElements = <Node?>[];
     for (Node? node in tree.activeFormattingElements.reversed) {
       if (node == null) {
         break;
@@ -1572,8 +1573,8 @@ class InBodyPhase extends Phase {
 
   void startTagFrameset(StartTagToken token) {
     parser.parseError(token.span, 'unexpected-start-tag', {'name': 'frameset'});
-    if ((tree.openElements.length == 1 ||
-        tree.openElements[1].localName != 'body')) {
+    if (tree.openElements.length == 1 ||
+        tree.openElements[1].localName != 'body') {
       assert(parser.innerHTMLMode);
     } else if (parser.framesetOK) {
       if (tree.openElements[1].parentNode != null) {
@@ -2120,7 +2121,7 @@ class InBodyPhase extends Phase {
         }
         // Step 6.4
         if (lastNode == furthestBlock) {
-          bookmark = (tree.activeFormattingElements.indexOf(node) + 1);
+          bookmark = tree.activeFormattingElements.indexOf(node) + 1;
         }
         // Step 6.5
         //cite = node.parent
@@ -2226,7 +2227,7 @@ class InBodyPhase extends Phase {
 }
 
 class TextPhase extends Phase {
-  TextPhase(HtmlParser parser) : super(parser);
+  TextPhase(super.parser);
 
   // "Tried to process start tag %s in RCDATA/RAWTEXT mode"%token.name
   @override
@@ -2276,7 +2277,7 @@ class TextPhase extends Phase {
 
 class InTablePhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-table
-  InTablePhase(HtmlParser parser) : super(parser);
+  InTablePhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -2506,9 +2507,7 @@ class InTableTextPhase extends Phase {
   Phase? originalPhase;
   List<StringToken> characterTokens;
 
-  InTableTextPhase(HtmlParser parser)
-      : characterTokens = <StringToken>[],
-        super(parser);
+  InTableTextPhase(super.parser) : characterTokens = <StringToken>[];
 
   void flushCharacters() {
     if (characterTokens.isEmpty) return;
@@ -2577,7 +2576,7 @@ class InTableTextPhase extends Phase {
 
 class InCaptionPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-caption
-  InCaptionPhase(HtmlParser parser) : super(parser);
+  InCaptionPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -2699,7 +2698,7 @@ class InCaptionPhase extends Phase {
 
 class InColumnGroupPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-column
-  InColumnGroupPhase(HtmlParser parser) : super(parser);
+  InColumnGroupPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -2787,7 +2786,7 @@ class InColumnGroupPhase extends Phase {
 
 class InTableBodyPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-table0
-  InTableBodyPhase(HtmlParser parser) : super(parser);
+  InTableBodyPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -2926,7 +2925,7 @@ class InTableBodyPhase extends Phase {
 
 class InRowPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-row
-  InRowPhase(HtmlParser parser) : super(parser);
+  InRowPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3072,7 +3071,7 @@ class InRowPhase extends Phase {
 
 class InCellPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-cell
-  InCellPhase(HtmlParser parser) : super(parser);
+  InCellPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3196,7 +3195,7 @@ class InCellPhase extends Phase {
 }
 
 class InSelectPhase extends Phase {
-  InSelectPhase(HtmlParser parser) : super(parser);
+  InSelectPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3352,7 +3351,7 @@ class InSelectPhase extends Phase {
 }
 
 class InSelectInTablePhase extends Phase {
-  InSelectInTablePhase(HtmlParser parser) : super(parser);
+  InSelectInTablePhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3478,7 +3477,7 @@ class InForeignContentPhase extends Phase {
     'var'
   ];
 
-  InForeignContentPhase(HtmlParser parser) : super(parser);
+  InForeignContentPhase(super.parser);
 
   void adjustSVGTagNames(StartTagToken token) {
     final replacements = const {
@@ -3608,7 +3607,7 @@ class InForeignContentPhase extends Phase {
 }
 
 class AfterBodyPhase extends Phase {
-  AfterBodyPhase(HtmlParser parser) : super(parser);
+  AfterBodyPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3680,7 +3679,7 @@ class AfterBodyPhase extends Phase {
 
 class InFramesetPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///in-frameset
-  InFramesetPhase(HtmlParser parser) : super(parser);
+  InFramesetPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3773,7 +3772,7 @@ class InFramesetPhase extends Phase {
 
 class AfterFramesetPhase extends Phase {
   // http://www.whatwg.org/specs/web-apps/current-work///after3
-  AfterFramesetPhase(HtmlParser parser) : super(parser);
+  AfterFramesetPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3830,7 +3829,7 @@ class AfterFramesetPhase extends Phase {
 }
 
 class AfterAfterBodyPhase extends Phase {
-  AfterAfterBodyPhase(HtmlParser parser) : super(parser);
+  AfterAfterBodyPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3881,7 +3880,7 @@ class AfterAfterBodyPhase extends Phase {
 }
 
 class AfterAfterFramesetPhase extends Phase {
-  AfterAfterFramesetPhase(HtmlParser parser) : super(parser);
+  AfterAfterFramesetPhase(super.parser);
 
   @override
   Token? processStartTag(StartTagToken token) {
@@ -3943,7 +3942,7 @@ class ParseError implements SourceSpanException {
   final String errorCode;
   @override
   final SourceSpan? span;
-  final Map? data;
+  final Map<String, Object?>? data;
 
   ParseError(this.errorCode, this.span, this.data);
 
@@ -3959,7 +3958,7 @@ class ParseError implements SourceSpanException {
   String get message => formatStr(errorMessages[errorCode]!, data);
 
   @override
-  String toString({color}) {
+  String toString({dynamic color}) {
     final res = span!.message(message, color: color);
     return span!.sourceUrl == null ? 'ParserError on $res' : 'On $res';
   }

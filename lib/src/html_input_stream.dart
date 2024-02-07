@@ -22,7 +22,7 @@ class HtmlInputStream {
   /// The name of the character encoding.
   String? charEncodingName;
 
-  /// True if we are certain about [charEncodingName], false for tenative.
+  /// True if we are certain about [charEncodingName], false for tentative.
   bool charEncodingCertain = true;
 
   final bool generateSpans;
@@ -35,7 +35,7 @@ class HtmlInputStream {
   /// Raw UTF-16 codes, used if a Dart String is passed in.
   List<int>? _rawChars;
 
-  var errors = Queue<String>();
+  Queue<String> errors = Queue<String>();
 
   SourceFile? fileInfo;
 
@@ -57,7 +57,7 @@ class HtmlInputStream {
   /// element)
   ///
   /// [parseMeta] - Look for a <meta> element containing encoding information
-  HtmlInputStream(source,
+  HtmlInputStream(dynamic source,
       [String? encoding,
       bool parseMeta = true,
       this.generateSpans = false,
@@ -329,16 +329,12 @@ bool _hasUtf8Bom(List<int> bytes, [int offset = 0, int? length]) {
 /// the codepoints. Supports the major unicode encodings as well as ascii and
 /// and windows-1252 encodings.
 List<int> _decodeBytes(String encoding, List<int> bytes) {
-  switch (encoding) {
-    case 'ascii':
-      return ascii.decode(bytes).codeUnits;
-
-    case 'utf-8':
+  return switch (encoding) {
+    'ascii' => ascii.decode(bytes).codeUnits,
+    'utf-8' =>
       // NOTE: To match the behavior of the other decode functions, we eat the
       // UTF-8 BOM here. This is the default behavior of `utf8.decode`.
-      return utf8.decode(bytes).codeUnits;
-
-    default:
-      throw ArgumentError('Encoding $encoding not supported');
-  }
+      utf8.decode(bytes).codeUnits,
+    _ => throw ArgumentError('Encoding $encoding not supported')
+  };
 }

@@ -1,8 +1,31 @@
-## 0.15.1-dev
+## 0.15.5-wip
+
+- Require Dart `3.2`.
+
+## 0.15.4
+
+- Widen the dependency on `package:csslib`.
+- Require Dart `2.19`.
+
+## 0.15.3
+
+- Added package topics to the pubspec file.
+
+## 0.15.2
+
+- Add additional types at the API boundary (in `lib/parser.dart` and others).
+- Adopted the `package:dart_flutter_team_lints` linting rules.
+- Fixed an issue with `querySelector` where it would fail in some cases with
+  descendant or sibling combinators (#157).
+- Add an API example in `example/`.
+
+## 0.15.1
 
 - Move `htmlSerializeEscape` to its own library,
   `package:html/html_escape.dart`, which is exported from
   `package:html/dom_parsing.dart`.
+- Use more non-growable lists, and type annotations on List literals.
+- Switch analysis option `implicit-casts: false` to `strict-casts: true`.
 
 ## 0.15.0
 
